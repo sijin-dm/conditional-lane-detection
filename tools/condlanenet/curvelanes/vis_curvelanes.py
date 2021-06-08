@@ -274,7 +274,6 @@ def single_gpu_test(seg_model,
         batch_size = data['img'].data[0].size(0)
         for _ in range(batch_size):
             prog_bar.update()
-        break
 
     if evaluate:
         print(evaluator.summary())
