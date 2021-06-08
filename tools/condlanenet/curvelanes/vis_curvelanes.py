@@ -194,8 +194,9 @@ def single_gpu_test(seg_model,
     hm_tp, hm_fp, hm_fn = 0, 0, 0
     out_seeds = []
     for i, data in enumerate(data_loader):
-        print(data['img'].data[0].shape)
-        exit()
+        for k,v in data['img_metas'].data[0][0].keys():
+            print(k, v.shape)
+
         with torch.no_grad():
             filename = data['img_metas'].data[0][0]['filename']
             sub_name = data['img_metas'].data[0][0]['sub_img_name']
@@ -203,9 +204,9 @@ def single_gpu_test(seg_model,
             ori_shape = data['img_metas'].data[0][0]['ori_shape']
             crop_offset = data['img_metas'].data[0][0]['crop_offset']
             crop_shape = data['img_metas'].data[0][0]['crop_shape']
-
-            seeds, hm = seg_model(
-                return_loss=False, rescale=False, thr=hm_thr, **data)
+            
+            seeds, hm = seg_model(data['imgs'],
+                return_loss=False, rescale=False, thr=hm_thr)
             downscale = data['img_metas'].data[0][0]['down_scale']
             lanes, seeds = post_processor(seeds, downscale)
 
@@ -294,6 +295,7 @@ def main():
         #mkdir(args.show_dst)
         os.makedirs(args.show_dst, exist_ok=True)
 
+    '''
     input_shape = (1, 3, 320, 800)
     mm_inputs = _demo_mm_inputs(input_shape)
 
@@ -309,7 +311,7 @@ def main():
                 print(k, v)
 
     exit()
-    # return
+    '''
     single_gpu_test(
         seg_model=model,
         data_loader=data_loader,
