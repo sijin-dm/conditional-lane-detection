@@ -194,6 +194,7 @@ def single_gpu_test(seg_model,
     hm_tp, hm_fp, hm_fn = 0, 0, 0
     out_seeds = []
     for i, data in enumerate(data_loader):
+        print(list(data.keys()))
         for k,v in data['img_metas'].data[0][0].items():
             print(k, v)
 
