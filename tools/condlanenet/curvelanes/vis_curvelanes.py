@@ -21,8 +21,6 @@ from tools.condlanenet.post_process import CurvelanesPostProcessor
 from tools.condlanenet.lane_metric import LaneMetricCore
 from tools.condlanenet.common import convert_coords_formal, parse_anno, COLORS
 
-from torch.utils.tensorboard import SummaryWriter
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description='MMDet test detector')
@@ -296,8 +294,6 @@ def main():
         #mkdir(args.show_dst)
         os.makedirs(args.show_dst, exist_ok=True)
 
-    writer = SummaryWriter('runs/curvelanes')
-
     input_shape = (1, 3, 320, 800)
     mm_inputs = _demo_mm_inputs(input_shape)
 
@@ -309,11 +305,8 @@ def main():
             if isinstance(v, torch.Tensor):
                 print(k, v.shape)
             else:
-                print(k)
+                print(k, v)
 
-    x = {'imgs': imgs, 'img_metas': img_metas}
-    writer.add_graph(model, **x)
-    writer.close()
     exit()
     # return
     single_gpu_test(
