@@ -296,7 +296,7 @@ def main():
         #mkdir(args.show_dst)
         os.makedirs(args.show_dst, exist_ok=True)
 
-    # writer = SummaryWriter('runs/curvelanes')
+    writer = SummaryWriter('runs/curvelanes')
 
     input_shape = (1, 3, 320, 800)
     mm_inputs = _demo_mm_inputs(input_shape)
@@ -305,8 +305,11 @@ def main():
     img_metas = mm_inputs.pop('img_metas')
     with torch.no_grad():
         y = model(imgs, img_metas, return_loss=False, rescale=False, thr=args.hm_thr)
-        print(y)
-
+        for k,v in y.items():
+            print(k, v.shape)
+    x = {'imgs': imgs, 'img_metas': img_metas}
+    writer.add_graph(model, **x)
+    writer.close()
     exit()
     # return
     single_gpu_test(
