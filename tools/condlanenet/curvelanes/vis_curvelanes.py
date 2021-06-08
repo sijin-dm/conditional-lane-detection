@@ -195,7 +195,7 @@ def single_gpu_test(seg_model,
     out_seeds = []
     for i, data in enumerate(data_loader):
         for k,v in data['img_metas'].data[0][0].items():
-            print(k, v.shape)
+            print(k, v)
 
         with torch.no_grad():
             filename = data['img_metas'].data[0][0]['filename']
