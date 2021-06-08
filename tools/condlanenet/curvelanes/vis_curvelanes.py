@@ -74,7 +74,7 @@ def adjust_result(lanes,
     return results
 
 
-def vis_one_for_paper(results,
+def vis_one_for_paper_old(results,
                       filename,
                       result_record,
                       ori_shape,
@@ -101,6 +101,30 @@ def vis_one_for_paper(results,
     img = np.array(img_pil, dtype=np.uint8)
     img_gt = np.array(img_gt_pil, dtype=np.uint8)
     return img, img_gt, num_failed, img_ori
+
+def vis_one_for_paper(results,
+                      filename,
+                      ori_shape,
+                      lane_width=11,
+                      draw_gt=True):
+    img = cv2.imread(filename)
+    img_ori = copy.deepcopy(img)
+    img_gt = copy.deepcopy(img)
+    img_pil = PIL.Image.fromarray(img)
+    img_gt_pil = PIL.Image.fromarray(img_gt)
+
+    annos = parse_anno(filename, formal=False)
+    if draw_gt:
+        for idx, anno_lane in enumerate(annos):
+            PIL.ImageDraw.Draw(img_gt_pil).line(
+                xy=anno_lane, fill=COLORS[idx + 1], width=lane_width)
+    for idx, pred_lane in enumerate(results):
+        PIL.ImageDraw.Draw(img_pil).line(
+            xy=pred_lane, fill=COLORS[idx + 1], width=lane_width)
+
+    img = np.array(img_pil, dtype=np.uint8)
+    img_gt = np.array(img_gt_pil, dtype=np.uint8)
+    return img, img_gt, img_ori
 
 
 
@@ -229,10 +253,9 @@ def single_gpu_test(seg_model,
 
             filename = data['img_metas'].data[0][0]['filename']
 
-            img_vis, img_gt_vis, num_failed, img_ori = vis_one_for_paper(
+            img_vis, img_gt_vis, img_ori = vis_one_for_paper(
                 result,
                 filename,
-                result_record=evaluator.result_record[-1],
                 ori_shape=ori_shape,
                 draw_gt=True,
                 lane_width=13)
@@ -245,14 +268,16 @@ def single_gpu_test(seg_model,
             dst_show_gt_dir = os.path.join(show, basename + '.gt.jpg')
             cv2.imwrite(dst_show_gt_dir, img_gt_vis)
 
-        if i % 100 == 0:
+        if evaluate and i % 100 == 0 :
             print(evaluator.summary())
 
         batch_size = data['img'].data[0].size(0)
         for _ in range(batch_size):
             prog_bar.update()
         break
-    print(evaluator.summary())
+
+    if evaluate:
+        print(evaluator.summary())
 
 
 class DateEnconding(json.JSONEncoder):
