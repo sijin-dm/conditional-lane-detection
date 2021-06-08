@@ -73,7 +73,11 @@ class CurvelanesDataset(CulaneDataset):
             img[:352, :, :] = img_tmp[368:, ...]
             crop_shape = (352, 1280, 3)
             crop_offset = [0, 368]
-
+        elif ori_shape == (1860, 2880, 3):
+            img = np.zeros((1000, 2880, 3), np.uint8)
+            img[:1000, :, :] = img_tmp[860:, ...]
+            crop_shape = (1000, 2880, 3)
+            crop_offset = [0, 860]
         else:
             return None
 
