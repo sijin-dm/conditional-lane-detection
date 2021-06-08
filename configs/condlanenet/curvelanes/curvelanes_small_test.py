@@ -3,7 +3,7 @@
 """
 # global settings
 dataset_type = 'CurvelanesDataset'
-data_root = "/disk1/zhouyang/dataset/Curvelanes"
+data_root = "/mnt/nas/share-map/experiment/sijin/03dataset/Curvelanes/Curvelanes"
 test_mode = False
 mask_down_scale = 8
 hm_down_scale = 16
