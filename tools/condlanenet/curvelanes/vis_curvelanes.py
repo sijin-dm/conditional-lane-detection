@@ -260,9 +260,9 @@ def single_gpu_test(seg_model,
                 draw_gt=False,
                 lane_width=13)
             
-            basename = sub_name.replace('/', '.')
+            basename = os.path.basename(sub_name)
             dst_show_dir = os.path.join(show, basename)
-            #mkdir(show)
+            print(dst_show_dir)
             os.makedirs(show, exist_ok=True)
             cv2.imwrite(dst_show_dir, img_vis)
             # dst_show_gt_dir = os.path.join(show, basename + '.gt.jpg')
