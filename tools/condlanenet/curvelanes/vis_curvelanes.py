@@ -305,7 +305,7 @@ def main():
     img_metas = mm_inputs.pop('img_metas')
     with torch.no_grad():
         y = model(imgs, img_metas, return_loss=False, rescale=False, thr=args.hm_thr)
-        for k,v in y.items():
+        for k,v in y[0][0].items():
             print(k, v.shape)
     x = {'imgs': imgs, 'img_metas': img_metas}
     writer.add_graph(model, **x)
