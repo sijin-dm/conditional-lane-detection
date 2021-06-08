@@ -299,8 +299,9 @@ def main():
 
     imgs = mm_inputs.pop('imgs')
     img_metas = mm_inputs.pop('img_metas')
+    print(img_metas)
     with torch.no_grad():
-        y = model(imgs, img_metas, return_loss=False, rescale=False, thr=args.hm_thr)
+        y = model(imgs, return_loss=False, rescale=False, thr=args.hm_thr)
         for k,v in y[0][0].items():
             if isinstance(v, torch.Tensor):
                 print(k, v.shape)
