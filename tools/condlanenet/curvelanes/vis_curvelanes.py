@@ -113,8 +113,8 @@ def vis_one_for_paper(results,
     img_pil = PIL.Image.fromarray(img)
     img_gt_pil = PIL.Image.fromarray(img_gt)
 
-    annos = parse_anno(filename, formal=False)
     if draw_gt:
+        annos = parse_anno(filename, formal=False)
         for idx, anno_lane in enumerate(annos):
             PIL.ImageDraw.Draw(img_gt_pil).line(
                 xy=anno_lane, fill=COLORS[idx + 1], width=lane_width)
@@ -257,7 +257,7 @@ def single_gpu_test(seg_model,
                 result,
                 filename,
                 ori_shape=ori_shape,
-                draw_gt=True,
+                draw_gt=False,
                 lane_width=13)
             
             basename = sub_name.replace('/', '.')
@@ -265,8 +265,8 @@ def single_gpu_test(seg_model,
             #mkdir(show)
             os.makedirs(show, exist_ok=True)
             cv2.imwrite(dst_show_dir, img_vis)
-            dst_show_gt_dir = os.path.join(show, basename + '.gt.jpg')
-            cv2.imwrite(dst_show_gt_dir, img_gt_vis)
+            # dst_show_gt_dir = os.path.join(show, basename + '.gt.jpg')
+            # cv2.imwrite(dst_show_gt_dir, img_gt_vis)
 
         if evaluate and i % 100 == 0 :
             print(evaluator.summary())
