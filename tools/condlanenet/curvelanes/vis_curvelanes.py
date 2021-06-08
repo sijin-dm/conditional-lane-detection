@@ -206,7 +206,7 @@ def single_gpu_test(seg_model,
             crop_offset = data['img_metas'].data[0][0]['crop_offset']
             crop_shape = data['img_metas'].data[0][0]['crop_shape']
             
-            seeds, hm = seg_model(data['imgs'],
+            seeds, hm = seg_model(**data,
                 return_loss=False, rescale=False, thr=hm_thr)
             downscale = data['img_metas'].data[0][0]['down_scale']
             lanes, seeds = post_processor(seeds, downscale)
