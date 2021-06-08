@@ -306,7 +306,11 @@ def main():
     with torch.no_grad():
         y = model(imgs, img_metas, return_loss=False, rescale=False, thr=args.hm_thr)
         for k,v in y[0][0].items():
-            print(k, v.shape)
+            if isinstance(v, torch.Tensor):
+                print(k, v.shape)
+            else:
+                print(k)
+
     x = {'imgs': imgs, 'img_metas': img_metas}
     writer.add_graph(model, **x)
     writer.close()
