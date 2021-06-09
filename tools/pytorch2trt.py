@@ -84,9 +84,6 @@ def parse_args():
 def main():
     args = parse_args()
 
-    if not args.out.endswith('.onnx'):
-        raise ValueError('The output file must be a onnx file.')
-
     if len(args.shape) == 1:
         input_shape = (3, args.shape[0], args.shape[0])
     elif len(args.shape) == 2:
@@ -103,18 +100,18 @@ def main():
     # Only support CPU mode for now
     model.cpu().eval()
     # Customized ops are not supported, use torchvision ops instead.
-    for m in model.modules():
-        if isinstance(m, (RoIPool, RoIAlign)):
-            # set use_torchvision on-the-fly
-            m.use_torchvision = True
+    # for m in model.modules():
+    #     if isinstance(m, (RoIPool, RoIAlign)):
+    #         # set use_torchvision on-the-fly
+    #         m.use_torchvision = True
 
     # TODO: a better way to override forward function
-    if hasattr(model, 'forward_dummy'):
-        model.forward = model.forward_dummy
-    else:
-        raise NotImplementedError(
-            'ONNX conversion is currently not currently supported with '
-            f'{model.__class__.__name__}')
+    # if hasattr(model, 'forward_dummy'):
+    #     model.forward = model.forward_dummy
+    # else:
+    #     raise NotImplementedError(
+    #         'ONNX conversion is currently not currently supported with '
+    #         f'{model.__class__.__name__}')
 
     x = torch.rand((1, *input_shape),
                              dtype=next(model.parameters()).dtype,
@@ -126,7 +123,7 @@ def main():
         [x],
         log_level=trt.Logger.INFO,  #max_workspace_size= (2<<30),
         input_names=["input"],
-        output_names=["output"])
+        output_names=None)
 
     print(f'saving model in {args.out}')
     save_engine(model_trt, args.out)
@@ -134,8 +131,8 @@ def main():
     with torch.no_grad():
         y = model(x)
         y_trt = model_trt(x)
-        # print(y.shape, y_trt.shape)
-        print('model diff:', torch.max(torch.abs(y - y_trt)))
+        for y0,y1 in zip(y,y_trt):
+            print(y0.shape, y1.shape, torch.max(torch.abs(y0 - y1)))
 
     # onnx_model = export_onnx_model(model, (input_data, ), args.passes)
     # # Print a human readable representation of the graph
