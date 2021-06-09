@@ -106,12 +106,13 @@ def main():
     #         m.use_torchvision = True
 
     # TODO: a better way to override forward function
-    # if hasattr(model, 'forward_dummy'):
-    #     model.forward = model.forward_dummy
-    # else:
-    #     raise NotImplementedError(
-    #         'ONNX conversion is currently not currently supported with '
-    #         f'{model.__class__.__name__}')
+    if hasattr(model, 'forward_dummy'):
+        model.forward = model.forward_dummy
+        print("forward dummy.")
+    else:
+        raise NotImplementedError(
+            'ONNX conversion is currently not currently supported with '
+            f'{model.__class__.__name__}')
 
     x = torch.rand((1, *input_shape),
                              dtype=next(model.parameters()).dtype,
