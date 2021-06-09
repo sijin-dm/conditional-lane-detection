@@ -10,7 +10,8 @@ from torch.onnx import OperatorExportTypes
 
 from mmdet.models import build_detector
 from mmdet.ops import RoIAlign, RoIPool
-
+from torch2trt import torch2trt
+import tensorrt as trt
 
 def export_onnx_model(model, inputs, passes):
     """
@@ -54,6 +55,11 @@ def export_onnx_model(model, inputs, passes):
             f'Only {all_passes} are supported'
     onnx_model = optimizer.optimize(onnx_model, passes)
     return onnx_model
+
+
+def save_engine(model, name='test.engine'):
+    with open(name, 'wb') as f:
+        f.write(model.engine.serialize())
 
 
 def parse_args():
@@ -110,15 +116,32 @@ def main():
             'ONNX conversion is currently not currently supported with '
             f'{model.__class__.__name__}')
 
-    input_data = torch.empty((1, *input_shape),
+    x = torch.rand((1, *input_shape),
                              dtype=next(model.parameters()).dtype,
-                             device=next(model.parameters()).device)
+                             device=next(model.parameters()).device).cuda()
 
-    onnx_model = export_onnx_model(model, (input_data, ), args.passes)
-    # Print a human readable representation of the graph
-    print('Model :\n\n{}'.format(onnx.helper.printable_graph(onnx_model.graph)))
+
+    model_trt = torch2trt(
+        model.cuda(),
+        [x],
+        log_level=trt.Logger.INFO,  #max_workspace_size= (2<<30),
+        input_names=["input"],
+        output_names=["output"])
+
     print(f'saving model in {args.out}')
-    onnx.save(onnx_model, args.out)
+    save_engine(model_trt, args.out)
+
+    with torch.no_grad():
+        y = model(x)
+        y_trt = model_trt(x)
+        # print(y.shape, y_trt.shape)
+        print('model diff:', torch.max(torch.abs(y - y_trt)))
+
+    # onnx_model = export_onnx_model(model, (input_data, ), args.passes)
+    # # Print a human readable representation of the graph
+    # onnx.helper.printable_graph(onnx_model.graph)
+    # print(f'saving model in {args.out}')
+    # onnx.save(onnx_model, args.out)
 
 
 if __name__ == '__main__':

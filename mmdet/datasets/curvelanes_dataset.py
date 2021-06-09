@@ -79,7 +79,9 @@ class CurvelanesDataset(CulaneDataset):
             crop_shape = (1000, 2880, 3)
             crop_offset = [0, 860]
         else:
-            return None
+            img = img_tmp
+            crop_shape = ori_shape
+            crop_offset = [0,0]
 
         results = dict(
             filename=imgname,
