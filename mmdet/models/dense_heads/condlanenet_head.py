@@ -628,6 +628,7 @@ class CondLaneRNNHead(nn.Module):
                 bias_nums.append(channels)
         return weight_nums, bias_nums
 
+    # TODO: This is needed to be rewrited, cause it supposed the batch is equal to 1.
     def ctdet_decode(self, heat, thr=0.1):
 
         def _nms(heat, kernel=3):
@@ -737,7 +738,7 @@ class CondLaneRNNHead(nn.Module):
 
         return hm, regs, masks, feat_range, states
 
-    def forward_test(
+    def forward_test_old(
             self,
             inputs,
             hm_thr=0.3,
@@ -836,6 +837,139 @@ class CondLaneRNNHead(nn.Module):
                 seeds[i]['mask'] = masks[0, start_ins_idx:end_ins_idx, :, :]
                 seeds[i]['range'] = feat_range[start_ins_idx:end_ins_idx]
                 start_ins_idx = end_ins_idx
+        return seeds, hm
+
+
+    def forward_test(
+            self,
+            inputs,
+            hm_thr=0.3,
+            max_rtimes=6,
+            memory=None,
+            hack_seeds=None,
+    ):
+
+        def parse_pos(seeds, batchsize, num_classes, h, w, device):
+            pos_list = [[p['coord'], p['id_class'] - 1] for p in seeds]
+            poses = []
+            for p in pos_list:
+                [c, r], label = p
+                pos = label * h * w + r * w + c
+                poses.append(pos)
+            poses = torch.from_numpy(np.array(
+                poses, np.long)).long().to(device).unsqueeze(1)
+            return poses
+
+        # Sijin: For curvelanes, the outpus feature map size is:
+        # torch.Size([1, 64, 40, 100]), for mask
+        #torch.Size([1, 64, 20, 50]), for headmap
+        #torch.Size([1, 64, 10, 25])
+
+        x_list = list(inputs)
+
+        f_hm = x_list[self.hm_idx]
+        m_batchsize = f_hm.size()[0]
+
+        # Proposal head in paper.
+        z = self.ctnet_head(f_hm)
+        h_hm, w_hm = f_hm.size()[2:]
+        # Sijin: parameters is used for each rnn cell, one position has one rnn cell to predict the end of the line.
+        hm, params = z['hm'], z['params']
+        # Sijin: I think the sigmoid is better to place in nn.Module instead.
+        hm = torch.clamp(hm.sigmoid(), min=1e-4, max=1 - 1e-4)
+        # Sijin: -1 is the channel of parameters.
+        # params = params.view(m_batchsize, self.num_classes, -1, h_hm, w_hm)
+        # params = params.permute(0, 1, 3, 4,
+        #                         2).contiguous().view(m_batchsize, -1, self.rnn_in_channels)
+
+     
+        
+        # This is the conditional part. It is better to calculate all the position, leave selecting job to user.
+        # if pos_tensor.size()[0] == 0:
+        #     return [], hm
+
+        # Conditional shape head in paper.
+        f_mask = x_list[self.mask_idx]
+        h_mask, w_mask = f_mask.size()[2:]
+        mask_branch = self.mask_branch(f_mask)
+        reg_branch = mask_branch
+        # self.debug_mask_branch = mask_branch
+        # self.debug_reg_branch = reg_branch
+        
+        params = params.permute(0, 2, 3, 1).reshape(m_batchsize, -1, self.rnn_in_channels)
+
+        kernel_params = []
+        num_ins_per_seed = []
+        ins_start_idx = []
+        for batch in range(m_batchsize):
+            for idx in range(params.size(1)):
+                ins_start_idx.append(len(kernel_params))
+                rnn_feat_input = params[batch, idx, :]
+                rnn_feat_input = rnn_feat_input.reshape(1, -1, 1, 1)
+                hidden_h = rnn_feat_input
+                hidden_c = rnn_feat_input
+                rnn_feat_input = rnn_feat_input.reshape(1, 1, -1, 1, 1)
+
+                if self.zero_hidden_state:
+                    hidden_state = None
+                else:
+                    hidden_state = (hidden_h, hidden_c)
+                num_ins_count = 0
+                # max instance number in one seed point.
+                for _ in range(max_rtimes):
+                    rnn_out, hidden_state = self.rnn_ceil(
+                        inputs=rnn_feat_input,
+                        hidden_state=hidden_state,
+                        seq_len=1)
+                    rnn_out = rnn_out.reshape(1, -1, 1, 1)
+                    k_param, state = self.final_fc(rnn_out)
+                    k_param = k_param.squeeze(-1).squeeze(-1)
+                    state = state.squeeze(-1).squeeze(-1)
+                    kernel_params.append(k_param)
+                    num_ins_count += 1
+                    if torch.argmax(state[0]) == 0:
+                        break
+                    rnn_feat_input = rnn_out
+                    rnn_feat_input = rnn_feat_input.reshape(1, 1, -1, 1, 1)
+                num_ins_per_seed.append(num_ins_count)
+    
+        # Sijin: actually, rnn predict the number of instance, and its kernel parameters for mask image.
+
+        num_ins = len(kernel_params)
+        kernel_params = torch.cat(kernel_params, 0)
+        mask_params = kernel_params[:, :self.num_mask_params]
+        reg_params = kernel_params[:, self.num_mask_params:]
+
+        masks = self.mask_head(mask_branch, mask_params, [num_ins])
+        regs = self.reg_head(reg_branch, reg_params, [num_ins])
+        feat_range = masks.permute(0, 1, 3,
+                                   2).view(num_ins, w_mask, h_mask)
+        # MLP only activate on feature_map width dim. and each row output two values stands for has point or not.
+        feat_range = self.mlp(feat_range)
+
+        ### Does not parse heatmap currently, util we decode all the points.
+        _, _, h, w = hm.size()
+        seeds = self.ctdet_decode(hm, thr=hm_thr)
+
+        for i in range(len(seeds)):
+            x,y = seeds[i]['coord']
+            c = seeds[i]['id_class'] -1
+            pos = c * h * w + y * w + x
+            start_ins_idx = ins_start_idx[pos]
+            end_ins_idx = start_ins_idx + num_ins_per_seed[pos]
+            seeds[i]['reg'] = regs[0, start_ins_idx:end_ins_idx, :, :]
+            seeds[i]['mask'] = masks[0, start_ins_idx:end_ins_idx, :, :]
+            seeds[i]['range'] = feat_range[start_ins_idx:end_ins_idx]
+
+
+         
+        # start_ins_idx = 0
+        # for i, idx_ins in enumerate(num_ins_per_seed):
+        #     end_ins_idx = start_ins_idx + idx_ins
+        #     seeds[i]['reg'] = regs[0, start_ins_idx:end_ins_idx, :, :]
+        #     seeds[i]['mask'] = masks[0, start_ins_idx:end_ins_idx, :, :]
+        #     seeds[i]['range'] = feat_range[start_ins_idx:end_ins_idx]
+        #     start_ins_idx = end_ins_idx
         return seeds, hm
 
     def forward(
