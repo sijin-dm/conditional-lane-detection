@@ -13,6 +13,7 @@ from .retina_sepbn_head import RetinaSepBNHead
 from .rpn_head import RPNHead
 from .ssd_head import SSDHead
 from .condlanenet_head import CondLaneHead
+from .condlanenet_head_trace import CondLaneRNNHeadTrace
 
 __all__ = [
     'CondLaneHead',

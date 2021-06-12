@@ -100,7 +100,6 @@ class DynamicMaskHead(nn.Module):
             self.locations = locations.to(device)
 
     def forward(self, x, mask_head_params, num_ins, is_mask=True):
-
         N, _, H, W = x.size()
         if not self.disable_coords:
             if self.compute_locations_pre and self.location_configs is not None:
@@ -738,7 +737,7 @@ class CondLaneRNNHead(nn.Module):
 
         return hm, regs, masks, feat_range, states
 
-    def forward_test_old(
+    def forward_test(
             self,
             inputs,
             hm_thr=0.3,
@@ -840,7 +839,7 @@ class CondLaneRNNHead(nn.Module):
         return seeds, hm
 
 
-    def forward_test(
+    def forward_test_dm(
             self,
             inputs,
             hm_thr=0.3,
@@ -882,11 +881,10 @@ class CondLaneRNNHead(nn.Module):
         # params = params.permute(0, 1, 3, 4,
         #                         2).contiguous().view(m_batchsize, -1, self.rnn_in_channels)
 
-     
+
         
         # This is the conditional part. It is better to calculate all the position, leave selecting job to user.
-        # if pos_tensor.size()[0] == 0:
-        #     return [], hm
+       
 
         # Conditional shape head in paper.
         f_mask = x_list[self.mask_idx]
@@ -895,7 +893,7 @@ class CondLaneRNNHead(nn.Module):
         reg_branch = mask_branch
         # self.debug_mask_branch = mask_branch
         # self.debug_reg_branch = reg_branch
-        
+
         params = params.permute(0, 2, 3, 1).reshape(m_batchsize, -1, self.rnn_in_channels)
 
         kernel_params = []
@@ -934,7 +932,6 @@ class CondLaneRNNHead(nn.Module):
                 num_ins_per_seed.append(num_ins_count)
     
         # Sijin: actually, rnn predict the number of instance, and its kernel parameters for mask image.
-
         num_ins = len(kernel_params)
         kernel_params = torch.cat(kernel_params, 0)
         mask_params = kernel_params[:, :self.num_mask_params]
@@ -961,15 +958,6 @@ class CondLaneRNNHead(nn.Module):
             seeds[i]['mask'] = masks[0, start_ins_idx:end_ins_idx, :, :]
             seeds[i]['range'] = feat_range[start_ins_idx:end_ins_idx]
 
-
-         
-        # start_ins_idx = 0
-        # for i, idx_ins in enumerate(num_ins_per_seed):
-        #     end_ins_idx = start_ins_idx + idx_ins
-        #     seeds[i]['reg'] = regs[0, start_ins_idx:end_ins_idx, :, :]
-        #     seeds[i]['mask'] = masks[0, start_ins_idx:end_ins_idx, :, :]
-        #     seeds[i]['range'] = feat_range[start_ins_idx:end_ins_idx]
-        #     start_ins_idx = end_ins_idx
         return seeds, hm
 
     def forward(

@@ -1,9 +1,6 @@
 import argparse
 import os
 import numpy as np
-import random
-import math
-import json
 import copy
 import cv2
 import mmcv
@@ -31,7 +28,7 @@ def parse_args():
     parser.add_argument('--show', action='store_true')
     parser.add_argument(
         '--show_dst',
-        default='./work_dirs/curvelanes/watch',
+        default=None,
         help='path to save visualized results.')
     parser.add_argument(
         '--evaluate',
@@ -73,35 +70,6 @@ def adjust_result(lanes,
                 results.append(pts)
     return results
 
-
-def vis_one_for_paper_old(results,
-                      filename,
-                      result_record,
-                      ori_shape,
-                      lane_width=11,
-                      draw_gt=True):
-    pr_list = result_record['pr_list']
-    gt_list = result_record['gt_list']
-    img = cv2.imread(filename)
-    img_ori = copy.deepcopy(img)
-    img_gt = copy.deepcopy(img)
-    img_pil = PIL.Image.fromarray(img)
-    img_gt_pil = PIL.Image.fromarray(img_gt)
-    num_failed = pr_list.count(False) + gt_list.count(False)
-
-    annos = parse_anno(filename, formal=False)
-    if draw_gt:
-        for idx, (anno_lane, _) in enumerate(zip(annos, gt_list)):
-            PIL.ImageDraw.Draw(img_gt_pil).line(
-                xy=anno_lane, fill=COLORS[idx + 1], width=lane_width)
-    for idx, (pred_lane, _) in enumerate(zip(results, pr_list)):
-        PIL.ImageDraw.Draw(img_pil).line(
-            xy=pred_lane, fill=COLORS[idx + 1], width=lane_width)
-
-    img = np.array(img_pil, dtype=np.uint8)
-    img_gt = np.array(img_gt_pil, dtype=np.uint8)
-    return img, img_gt, num_failed, img_ori
-
 def vis_one_for_paper(results,
                       filename,
                       ori_shape,
@@ -112,12 +80,6 @@ def vis_one_for_paper(results,
     img_gt = copy.deepcopy(img)
     img_pil = PIL.Image.fromarray(img)
     img_gt_pil = PIL.Image.fromarray(img_gt)
-
-    if draw_gt:
-        annos = parse_anno(filename, formal=False)
-        for idx, anno_lane in enumerate(annos):
-            PIL.ImageDraw.Draw(img_gt_pil).line(
-                xy=anno_lane, fill=COLORS[idx + 1], width=lane_width)
     for idx, pred_lane in enumerate(results):
         PIL.ImageDraw.Draw(img_pil).line(
             xy=pred_lane, fill=COLORS[idx + 1], width=lane_width)
@@ -126,75 +88,6 @@ def vis_one_for_paper(results,
     img_gt = np.array(img_gt_pil, dtype=np.uint8)
     return img, img_gt, img_ori
 
-
-
-def _demo_mm_inputs(input_shape=(1, 3, 300, 300),
-                    num_items=None, num_classes=10):  # yapf: disable
-    """
-    Create a superset of inputs needed to run test or train batches.
-
-    Args:
-        input_shape (tuple):
-            input batch dimensions
-
-        num_items (None | List[int]):
-            specifies the number of boxes in each batch item
-
-        num_classes (int):
-            number of different labels a box might have
-    """
-    from mmdet.core import BitmapMasks
-
-    (N, C, H, W) = input_shape
-
-    rng = np.random.RandomState(0)
-
-    imgs = rng.rand(*input_shape)
-
-    img_metas = [{
-        'img_shape': (H, W, C),
-        'ori_shape': (H, W, C),
-        'pad_shape': (H, W, C),
-        'filename': '<demo>.png',
-        'scale_factor': 1.0,
-        'flip': False,
-    } for _ in range(N)]
-
-    gt_bboxes = []
-    gt_labels = []
-    gt_masks = []
-
-    for batch_idx in range(N):
-        if num_items is None:
-            num_boxes = rng.randint(1, 10)
-        else:
-            num_boxes = num_items[batch_idx]
-
-        cx, cy, bw, bh = rng.rand(num_boxes, 4).T
-
-        tl_x = ((cx * W) - (W * bw / 2)).clip(0, W)
-        tl_y = ((cy * H) - (H * bh / 2)).clip(0, H)
-        br_x = ((cx * W) + (W * bw / 2)).clip(0, W)
-        br_y = ((cy * H) + (H * bh / 2)).clip(0, H)
-
-        boxes = np.vstack([tl_x, tl_y, br_x, br_y]).T
-        class_idxs = rng.randint(1, num_classes, size=num_boxes)
-
-        gt_bboxes.append(torch.FloatTensor(boxes))
-        gt_labels.append(torch.LongTensor(class_idxs))
-
-    mask = np.random.randint(0, 2, (len(boxes), H, W), dtype=np.uint8)
-    gt_masks.append(BitmapMasks(mask, H, W))
-
-    mm_inputs = {
-        'imgs': torch.FloatTensor(imgs).requires_grad_(True),
-        'img_metas': img_metas,
-        'gt_bboxes': gt_bboxes,
-        'gt_labels': gt_labels,
-        'gt_bboxes_ignore': None,
-        'gt_masks': gt_masks,
-    }
-    return mm_inputs
 
 def single_gpu_test(seg_model,
                     data_loader,
@@ -209,19 +102,8 @@ def single_gpu_test(seg_model,
     dataset = data_loader.dataset
     post_processor = CurvelanesPostProcessor(
         mask_size=mask_size, hm_thr=hm_thr)
-    evaluator = LaneMetricCore(
-        eval_width=eval_width,
-        eval_height=eval_height,
-        iou_thresh=0.5,
-        lane_width=lane_width)
     prog_bar = mmcv.ProgressBar(len(dataset))
-    hm_tp, hm_fp, hm_fn = 0, 0, 0
-    out_seeds = []
     for i, data in enumerate(data_loader):
-        print(list(data.keys()))
-        for k,v in data['img_metas'].data[0][0].items():
-            print(k, v)
-
         with torch.no_grad():
             filename = data['img_metas'].data[0][0]['filename']
             sub_name = data['img_metas'].data[0][0]['sub_img_name']
@@ -230,60 +112,33 @@ def single_gpu_test(seg_model,
             crop_offset = data['img_metas'].data[0][0]['crop_offset']
             crop_shape = data['img_metas'].data[0][0]['crop_shape']
             
-            seeds, hm = seg_model(**data,
-                return_loss=False, rescale=False, thr=hm_thr)
+            seeds, hm = seg_model(data['img'])
             downscale = data['img_metas'].data[0][0]['down_scale']
             lanes, seeds = post_processor(seeds, downscale)
 
+            # This is the predicted points of each lane.
             result = adjust_result(
                 lanes=lanes,
                 crop_offset=crop_offset,
                 crop_shape=crop_shape,
                 img_shape=img_shape,
                 tgt_shape=ori_shape)
-            if evaluate:
-                pred = convert_coords_formal(result)
-                anno = parse_anno(filename)
-                gt_wh = dict(height=ori_shape[0], width=ori_shape[1])
-                predict_spec = dict(Lines=pred, Shape=gt_wh)
-                target_spec = dict(Lines=anno, Shape=gt_wh)
-                evaluator(target_spec, predict_spec)
 
-        if show is not None and show:
-
+        if show is not None:
             filename = data['img_metas'].data[0][0]['filename']
-
-            img_vis, img_gt_vis, img_ori = vis_one_for_paper(
+            img_vis, _, _ = vis_one_for_paper(
                 result,
                 filename,
                 ori_shape=ori_shape,
                 draw_gt=False,
                 lane_width=13)
-            
             basename = os.path.basename(sub_name)
             dst_show_dir = os.path.join(show, basename)
-            print(dst_show_dir)
-            os.makedirs(show, exist_ok=True)
             cv2.imwrite(dst_show_dir, img_vis)
-            # dst_show_gt_dir = os.path.join(show, basename + '.gt.jpg')
-            # cv2.imwrite(dst_show_gt_dir, img_gt_vis)
-
-        if evaluate and i % 100 == 0 :
-            print(evaluator.summary())
 
         batch_size = data['img'].data[0].size(0)
         for _ in range(batch_size):
             prog_bar.update()
-
-    if evaluate:
-        print(evaluator.summary())
-
-
-class DateEnconding(json.JSONEncoder):
-
-    def default(self, o):
-        if isinstance(o, np.float32):
-            return float(o)
 
 
 def main():
@@ -314,29 +169,11 @@ def main():
     model = build_detector(cfg.model)
     load_checkpoint(model, args.checkpoint, map_location='cpu')
     model = MMDataParallel(model, device_ids=[0])
-    show_dst = None
-    if args.show:
-        show_dst = args.show_dst
-        #mkdir(args.show_dst)
-        os.makedirs(args.show_dst, exist_ok=True)
+    show_dst = args.show_dst
+    if show_dst is not None:
+        print("Saving output to: {}".format(show_dst))
+        os.makedirs(show_dst, exist_ok=True)
 
-    '''
-    input_shape = (1, 3, 320, 800)
-    mm_inputs = _demo_mm_inputs(input_shape)
-
-    imgs = mm_inputs.pop('imgs')
-    img_metas = mm_inputs.pop('img_metas')
-    print(img_metas)
-    with torch.no_grad():
-        y = model(imgs, return_loss=False, rescale=False, thr=args.hm_thr)
-        for k,v in y[0][0].items():
-            if isinstance(v, torch.Tensor):
-                print(k, v.shape)
-            else:
-                print(k, v)
-
-    exit()
-    '''
     single_gpu_test(
         seg_model=model,
         data_loader=data_loader,

@@ -91,7 +91,7 @@ class AttentionLayer(nn.Module):
             padding=1,
             norm_cfg=norm_cfg,
             act_cfg=act_cfg)
-        self.softmax = nn.Softmax(dim=-1)
+        self.softmax = nn.Softmax(dim=2) # Sijin: can not use -1.
         self.gamma = nn.Parameter(torch.zeros(1))
 
     def forward(self, x, pos=None):
@@ -105,7 +105,7 @@ class AttentionLayer(nn.Module):
         x = self.pre_conv(x)
         m_batchsize, _, height, width = x.size()
         if pos is not None:
-            x += pos
+            x = x + pos
         proj_query = self.query_conv(x).view(m_batchsize, -1,
                                              width * height).permute(0, 2, 1)
         proj_key = self.key_conv(x).view(m_batchsize, -1, width * height)
@@ -255,13 +255,11 @@ class TransConvFPN(nn.Module):
         src = list(src)
         if self.attention:
             trans_feat = self.trans_head(src[self.trans_idx])
-        else:
-            trans_feat = src[self.trans_idx]
-        inputs = src[:-1]
-        inputs.append(trans_feat)
+            src[self.trans_idx] = trans_feat
+        inputs = src
+
         if len(inputs) > len(self.in_channels):
-            for _ in range(len(inputs) - len(self.in_channels)):
-                del inputs[0]
+            inputs = inputs[len(inputs) - len(self.in_channels): ]
 
         # build laterals
         laterals = [

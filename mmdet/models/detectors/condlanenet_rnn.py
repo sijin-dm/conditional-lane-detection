@@ -177,8 +177,8 @@ class CurvelanesRnn(SingleStageDetector):
         if hasattr(self, 'neck') and self.neck:
             output, memory = self.neck(output)
         if self.head:
-            seeds, hm = self.bbox_head.forward_test(output, 0.5)
-        return [seeds, hm]
+            output= self.bbox_head.forward_test(output, 0.5)
+        return list(output)
 
     def forward_test(self,
                      img,

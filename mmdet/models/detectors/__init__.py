@@ -17,6 +17,7 @@ from .single_stage import SingleStageDetector
 from .two_stage import TwoStageDetector
 from .condlanenet import CondLaneNet
 from .condlanenet_rnn import CurvelanesRnn
+from .condlanenet_rnn_trace import CurvelanesRnnTrace
 
 __all__ = [
     'CondLaneNet',

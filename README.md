@@ -4,10 +4,10 @@ We achieve state-of-the-art performance on multiple lane detection benchmarks.
 
 ![Architecture,](images/scheme.png)
 
-## Installation
-
-
-This implementation is based on mmdetection(v2.0.0). Please refer to [install.md](docs/install.md) for installation.
+## Installation 
+```python
+python setup.py develop
+```
 
 ## Datasets
 We conducted experiments on CurveLanes, CULane and TuSimple. Please refer to [dataset.md](dataset.md) for installation. 
@@ -28,7 +28,22 @@ tusimple_medium | 152FPS | 96.98 | [download](https://virutalbuy-public.oss-cn-h
 tusimple_large | 58FPS | 97.24 | [download](https://virutalbuy-public.oss-cn-hangzhou.aliyuncs.com/share/CondLaneNet/models/tusimple/tusimple_large.pth)
 
 ## Testing
+
+**Visualize Precition**
+
+1 Edit the "data_root" in the config file to your Curvelanes dataset path. 
+For example, for the small version, open "configs/curvelanes/curvelanes_small_test_custom.py" and 
+set "data_root" to "[your-image-path]".
+
+2 run the test script
+
+``` bash
+cd [project-root]
+python tools/condlanenet/curvelanes/vis_curvelanes.py configs/condlanenet/curvelanes/curvelanes_small_test_custom.py [model-path] --show_dst [output-path] 
+```
+
 **CurveLanes**
+
 1 Edit the "data_root" in the config file to your Curvelanes dataset path. 
 For example, for the small version, open "configs/curvelanes/curvelanes_small_test.py" and 
 set "data_root" to "[your-data-path]/curvelanes".
