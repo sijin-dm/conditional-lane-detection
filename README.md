@@ -29,7 +29,7 @@ tusimple_large | 58FPS | 97.24 | [download](https://virutalbuy-public.oss-cn-han
 
 ## Testing
 
-**Visualize Precition**
+**Visualize Prediction**
 
 1 Edit the "data_root" in the config file to your Curvelanes dataset path. 
 For example, for the small version, open "configs/curvelanes/curvelanes_small_test_custom.py" and 
